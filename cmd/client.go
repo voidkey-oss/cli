@@ -28,10 +28,11 @@ func NewVoidkeyClient(client HTTPClient, serverURL string) *VoidkeyClient {
 }
 
 // MintCredentials calls the broker server to mint credentials
-func (c *VoidkeyClient) MintCredentials(oidcToken string) (*CloudCredentials, error) {
+func (c *VoidkeyClient) MintCredentials(oidcToken string, idpName string) (*CloudCredentials, error) {
 	// Prepare request
 	reqBody := MintRequest{
 		OidcToken: oidcToken,
+		IdpName:   idpName,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
