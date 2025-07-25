@@ -1,0 +1,107 @@
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: voidkey-cli
+    binary: voidkey
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+      - '^style:'
+      - '^refactor:'
+      - merge conflict
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+
+release:
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## Voidkey CLI {{ .Tag }}
+    
+    Zero-trust credential broker CLI for dynamically minting short-lived cloud credentials.
+    
+    ### Installation
+    
+    #### Linux/macOS
+    ```bash
+    # Download and install
+    curl -L https://github.com/voidkey-labs/cli/releases/download/{{ .Tag }}/voidkey_Linux_x86_64.tar.gz | tar -xz
+    sudo mv voidkey /usr/local/bin/
+    ```
+    
+    #### Windows
+    Download the appropriate `.zip` file from the assets below and extract `voidkey.exe` to your PATH.
+    
+    ### Usage
+    ```bash
+    # Mint credentials (uses dummy token for hello world)
+    voidkey mint
+    
+    # Mint with custom OIDC token
+    voidkey mint --token "your-oidc-token"
+    
+    # Output as JSON
+    voidkey mint --output json
+    
+    # Use different server
+    voidkey mint --server https://your-broker.example.com
+    
+    # Source credentials into environment
+    eval "$(voidkey mint)"
+    ```
+  
+  footer: |
+    **Full Changelog**: https://github.com/voidkey-labs/cli/compare/{{ .PreviousTag }}...{{ .Tag }}
+    
+    ---
+    
+    🔐 **Voidkey** - Zero-trust credential broker
+    📚 [Documentation](https://github.com/voidkey-labs/cli)
+    🐛 [Report Issues](https://github.com/voidkey-labs/cli/issues)
