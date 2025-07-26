@@ -48,7 +48,7 @@ func TestListIdpProviders_Success(t *testing.T) {
 	err := cmd.RunE(cmd, []string{})
 
 	assert.NoError(t, err)
-	
+
 	output := stdout.String()
 	assert.Contains(t, output, "NAME")
 	assert.Contains(t, output, "DEFAULT")
@@ -79,7 +79,7 @@ func TestListIdpProviders_EmptyList(t *testing.T) {
 	err := cmd.RunE(cmd, []string{})
 
 	assert.NoError(t, err)
-	
+
 	output := stdout.String()
 	assert.Contains(t, output, "No Identity Providers configured")
 
@@ -109,7 +109,7 @@ func TestListIdpProviders_SingleProvider(t *testing.T) {
 	err := cmd.RunE(cmd, []string{})
 
 	assert.NoError(t, err)
-	
+
 	output := stdout.String()
 	assert.Contains(t, output, "auth0")
 	assert.Contains(t, output, "✓")
@@ -142,12 +142,12 @@ func TestListIdpProviders_MultipleProvidersNoDefault(t *testing.T) {
 	err := cmd.RunE(cmd, []string{})
 
 	assert.NoError(t, err)
-	
+
 	output := stdout.String()
 	assert.Contains(t, output, "auth0")
 	assert.Contains(t, output, "github")
 	assert.Contains(t, output, "okta")
-	
+
 	// Count occurrences of ✓ (should be 0)
 	checkmarkCount := strings.Count(output, "✓")
 	assert.Equal(t, 0, checkmarkCount)
@@ -202,17 +202,17 @@ func TestListIdpProviders_TableFormatting(t *testing.T) {
 	err := cmd.RunE(cmd, []string{})
 
 	assert.NoError(t, err)
-	
+
 	output := stdout.String()
 	lines := strings.Split(strings.TrimSpace(output), "\n")
-	
+
 	// Should have header, separator, and 2 data rows
 	assert.GreaterOrEqual(t, len(lines), 4)
-	
+
 	// Check header
 	assert.Contains(t, lines[0], "NAME")
 	assert.Contains(t, lines[0], "DEFAULT")
-	
+
 	// Check separator
 	assert.Contains(t, lines[1], "----")
 	assert.Contains(t, lines[1], "-------")
@@ -249,7 +249,7 @@ func TestListIdpProviders_Integration(t *testing.T) {
 	err := rootCmd.Execute()
 
 	assert.NoError(t, err)
-	
+
 	output := stdout.String()
 	assert.Contains(t, output, "test-provider")
 

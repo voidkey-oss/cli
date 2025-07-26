@@ -47,7 +47,9 @@ func (c *VoidkeyClient) MintCredentials(oidcToken string, idpName string) (*Clou
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -81,7 +83,9 @@ func (c *VoidkeyClient) ListIdpProviders() ([]IdpProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

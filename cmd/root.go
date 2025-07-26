@@ -31,7 +31,7 @@ func Execute() {
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "http://localhost:3000", "Voidkey broker server URL")
-	
+
 	// Initialize commands after flags are set up
 	initCommands()
 }
@@ -39,11 +39,11 @@ func init() {
 func initCommands() {
 	// Initialize client
 	client := NewVoidkeyClient(&http.Client{}, serverURL)
-	
+
 	// Initialize commands with dependency injection
 	mintCmd := mintCreds(client)
 	listIdpsCmd := listIdpProviders(client)
-	
+
 	rootCmd.AddCommand(mintCmd)
 	rootCmd.AddCommand(listIdpsCmd)
 }

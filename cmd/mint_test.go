@@ -23,14 +23,14 @@ func TestMintCreds_CommandCreation(t *testing.T) {
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "mint", cmd.Use)
 	assert.Contains(t, cmd.Short, "Mint short-lived cloud credentials")
-	
+
 	// Check flags are set up
 	tokenFlag := cmd.Flags().Lookup("token")
 	assert.NotNil(t, tokenFlag)
-	
+
 	outputFlag := cmd.Flags().Lookup("output")
 	assert.NotNil(t, outputFlag)
-	
+
 	idpFlag := cmd.Flags().Lookup("idp")
 	assert.NotNil(t, idpFlag)
 }
@@ -62,7 +62,7 @@ func TestMintCredentialsWithFlags_Success(t *testing.T) {
 	err := mintCredentialsWithFlags(client, cmd, "test-token", "env", "test-idp")
 
 	assert.NoError(t, err)
-	
+
 	// Check output contains expected environment variables
 	output := stdout.String()
 	assert.Contains(t, output, "export AWS_ACCESS_KEY_ID=AKIATEST123")
@@ -100,7 +100,7 @@ func TestMintCredentialsWithFlags_JSONOutput(t *testing.T) {
 	err := mintCredentialsWithFlags(client, cmd, "test-token", "json", "test-idp")
 
 	assert.NoError(t, err)
-	
+
 	// Check output is valid JSON
 	output := stdout.String()
 	var parsedCreds CloudCredentials
@@ -121,8 +121,8 @@ func TestMintCredentialsWithFlags_NoToken(t *testing.T) {
 	cmd.SetErr(&stderr)
 
 	// Clear any environment variables
-	os.Unsetenv("OIDC_TOKEN")
-	os.Unsetenv("GITHUB_TOKEN")
+	_ = os.Unsetenv("OIDC_TOKEN")
+	_ = os.Unsetenv("GITHUB_TOKEN")
 
 	err := mintCredentialsWithFlags(client, cmd, "", "env", "")
 
@@ -158,7 +158,7 @@ func TestMintCredentialsWithFlags_HelloWorldIdP(t *testing.T) {
 	err := mintCredentialsWithFlags(client, cmd, "", "env", "hello-world")
 
 	assert.NoError(t, err)
-	
+
 	// Check stderr for hello-world message
 	stderrOutput := stderr.String()
 	assert.Contains(t, stderrOutput, "Using hello-world IdP with default token")
@@ -190,12 +190,12 @@ func TestMintCredentialsWithFlags_EnvironmentTokens(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean environment
-			os.Unsetenv("OIDC_TOKEN")
-			os.Unsetenv("GITHUB_TOKEN")
+			_ = os.Unsetenv("OIDC_TOKEN")
+			_ = os.Unsetenv("GITHUB_TOKEN")
 
 			// Set test environment variable
-			os.Setenv(tt.envVar, tt.envValue)
-			defer os.Unsetenv(tt.envVar)
+			_ = os.Setenv(tt.envVar, tt.envValue)
+			defer func() { _ = os.Unsetenv(tt.envVar) }()
 
 			mockClient := &MockHTTPClient{}
 			client := NewVoidkeyClient(mockClient, "http://localhost:3000")
@@ -222,7 +222,7 @@ func TestMintCredentialsWithFlags_EnvironmentTokens(t *testing.T) {
 			err := mintCredentialsWithFlags(client, cmd, "", "env", "")
 
 			assert.NoError(t, err)
-			
+
 			// Check stderr for environment variable message
 			stderrOutput := stderr.String()
 			assert.Contains(t, stderrOutput, tt.expected)
@@ -296,7 +296,7 @@ func TestOutputAsJSON(t *testing.T) {
 	outputAsJSON(creds, cmd)
 
 	output := stdout.String()
-	
+
 	// Parse JSON to verify it's valid
 	var parsedCreds CloudCredentials
 	err := json.Unmarshal([]byte(output), &parsedCreds)

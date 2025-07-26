@@ -25,7 +25,7 @@ func mintCreds(voidkeyClient *VoidkeyClient) *cobra.Command {
 	var localOidcToken string
 	var localOutputFormat string
 	var localIdpName string
-	
+
 	cmd := &cobra.Command{
 		Use:   "mint",
 		Short: "Mint short-lived cloud credentials",
@@ -52,17 +52,17 @@ func mintCredentialsWithFlags(client *VoidkeyClient, cmd *cobra.Command, token, 
 			// Also check for GitHub Actions token as a common case
 			token = os.Getenv("GITHUB_TOKEN")
 			if token != "" {
-				fmt.Fprintf(cmd.ErrOrStderr(), "🔍 Using GITHUB_TOKEN environment variable\n")
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "🔍 Using GITHUB_TOKEN environment variable\n")
 			}
 		} else {
-			fmt.Fprintf(cmd.ErrOrStderr(), "🔍 Using OIDC_TOKEN environment variable\n")
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "🔍 Using OIDC_TOKEN environment variable\n")
 		}
 	}
 
 	// Special case for hello-world IdP - provide default token
 	if token == "" && idpName == "hello-world" {
 		token = "cli-hello-world-token"
-		fmt.Fprintf(cmd.ErrOrStderr(), "🎭 Using hello-world IdP with default token\n")
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "🎭 Using hello-world IdP with default token\n")
 	}
 
 	// Require a valid OIDC token
@@ -80,9 +80,9 @@ func mintCredentialsWithFlags(client *VoidkeyClient, cmd *cobra.Command, token, 
 
 	// Show IdP selection info
 	if idpName != "" {
-		fmt.Fprintf(cmd.ErrOrStderr(), "🔍 Using IdP provider: %s\n", idpName)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "🔍 Using IdP provider: %s\n", idpName)
 	} else {
-		fmt.Fprintf(cmd.ErrOrStderr(), "🔍 Using server default IdP provider\n")
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "🔍 Using server default IdP provider\n")
 	}
 
 	// Mint credentials using client
@@ -105,21 +105,21 @@ func mintCredentialsWithFlags(client *VoidkeyClient, cmd *cobra.Command, token, 
 }
 
 func outputAsEnvVars(creds CloudCredentials, cmd *cobra.Command) {
-	fmt.Fprintf(cmd.OutOrStdout(), "export AWS_ACCESS_KEY_ID=%s\n", creds.AccessKey)
-	fmt.Fprintf(cmd.OutOrStdout(), "export AWS_SECRET_ACCESS_KEY=%s\n", creds.SecretKey)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "export AWS_ACCESS_KEY_ID=%s\n", creds.AccessKey)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "export AWS_SECRET_ACCESS_KEY=%s\n", creds.SecretKey)
 	if creds.SessionToken != "" {
-		fmt.Fprintf(cmd.OutOrStdout(), "export AWS_SESSION_TOKEN=%s\n", creds.SessionToken)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "export AWS_SESSION_TOKEN=%s\n", creds.SessionToken)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "export AWS_CREDENTIAL_EXPIRATION=%s\n", creds.ExpiresAt)
-	
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "export AWS_CREDENTIAL_EXPIRATION=%s\n", creds.ExpiresAt)
+
 	// Print success message to stderr so it doesn't interfere with sourcing
-	fmt.Fprintf(cmd.ErrOrStderr(), "✅ Credentials minted successfully (expires: %s)\n", creds.ExpiresAt)
-	fmt.Fprintf(cmd.ErrOrStderr(), "💡 To use: eval \"$(voidkey mint)\"\n")
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "✅ Credentials minted successfully (expires: %s)\n", creds.ExpiresAt)
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "💡 To use: eval \"$(voidkey mint)\"\n")
 }
 
 func outputAsJSON(creds CloudCredentials, cmd *cobra.Command) {
 	output, _ := json.MarshalIndent(creds, "", "  ")
-	fmt.Fprintf(cmd.OutOrStdout(), "%s\n", string(output))
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\n", string(output))
 }
 
 // init function removed - commands are now initialized in root.go

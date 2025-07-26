@@ -16,7 +16,7 @@ import (
 // CreateMockHTTPResponse creates a mock HTTP response for testing
 func CreateMockHTTPResponse(statusCode int, body interface{}) *http.Response {
 	var bodyReader io.Reader
-	
+
 	if body != nil {
 		switch v := body.(type) {
 		case string:
@@ -71,13 +71,13 @@ func CreateTestIdpProviders() []IdpProvider {
 func AssertCommandOutput(t *testing.T, stdout, stderr *bytes.Buffer, expectedStdout, expectedStderr []string) {
 	stdoutStr := stdout.String()
 	stderrStr := stderr.String()
-	
+
 	for _, expected := range expectedStdout {
 		if expected != "" && !bytes.Contains(stdout.Bytes(), []byte(expected)) {
 			t.Errorf("Expected stdout to contain '%s', got: %s", expected, stdoutStr)
 		}
 	}
-	
+
 	for _, expected := range expectedStderr {
 		if expected != "" && !bytes.Contains(stderr.Bytes(), []byte(expected)) {
 			t.Errorf("Expected stderr to contain '%s', got: %s", expected, stderrStr)
@@ -100,7 +100,7 @@ func MockSuccessfulListResponse(mockClient *MockHTTPClient, serverURL string, pr
 // MockErrorResponse sets up a mock for error responses
 func MockErrorResponse(mockClient *MockHTTPClient, method, url string, statusCode int, errorMessage string) {
 	resp := CreateMockHTTPResponse(statusCode, errorMessage)
-	
+
 	switch method {
 	case "POST":
 		mockClient.On("Post", url, "application/json", mock.Anything).Return(resp, nil)
@@ -112,11 +112,11 @@ func MockErrorResponse(mockClient *MockHTTPClient, method, url string, statusCod
 // TestMockHTTPClient_Implementation verifies the mock implementation works correctly
 func TestMockHTTPClient_Implementation(t *testing.T) {
 	mockClient := &MockHTTPClient{}
-	
+
 	// Test POST method
 	resp := CreateMockHTTPResponse(200, "test body")
 	mockClient.On("Post", "http://test.com", "application/json", mock.Anything).Return(resp, nil)
-	
+
 	result, err := mockClient.Post("http://test.com", "application/json", bytes.NewReader([]byte("test")))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -124,7 +124,7 @@ func TestMockHTTPClient_Implementation(t *testing.T) {
 	if result.StatusCode != 200 {
 		t.Errorf("Expected status 200, got %d", result.StatusCode)
 	}
-	
+
 	mockClient.AssertExpectations(t)
 }
 
@@ -155,20 +155,20 @@ func TestCreateMockHTTPResponse(t *testing.T) {
 			expected:   "",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp := CreateMockHTTPResponse(tt.statusCode, tt.body)
-			
+
 			if resp.StatusCode != tt.statusCode {
 				t.Errorf("Expected status %d, got %d", tt.statusCode, resp.StatusCode)
 			}
-			
+
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("Error reading body: %v", err)
 			}
-			
+
 			if string(body) != tt.expected {
 				t.Errorf("Expected body '%s', got '%s'", tt.expected, string(body))
 			}
@@ -179,7 +179,7 @@ func TestCreateMockHTTPResponse(t *testing.T) {
 // TestCreateTestCredentials verifies the test credentials helper
 func TestCreateTestCredentials(t *testing.T) {
 	creds := CreateTestCredentials()
-	
+
 	if creds.AccessKey == "" {
 		t.Error("AccessKey should not be empty")
 	}
@@ -194,11 +194,11 @@ func TestCreateTestCredentials(t *testing.T) {
 // TestCreateTestIdpProviders verifies the test providers helper
 func TestCreateTestIdpProviders(t *testing.T) {
 	providers := CreateTestIdpProviders()
-	
+
 	if len(providers) == 0 {
 		t.Error("Should return at least one provider")
 	}
-	
+
 	// Check that exactly one provider is marked as default
 	defaultCount := 0
 	for _, provider := range providers {
@@ -206,7 +206,7 @@ func TestCreateTestIdpProviders(t *testing.T) {
 			defaultCount++
 		}
 	}
-	
+
 	if defaultCount != 1 {
 		t.Errorf("Expected exactly 1 default provider, got %d", defaultCount)
 	}

@@ -36,17 +36,17 @@ func TestExecute(t *testing.T) {
 func TestInitCommands(t *testing.T) {
 	// Save original state
 	originalCommands := rootCmd.Commands()
-	
+
 	// Clear commands to test initialization
 	rootCmd.ResetCommands()
-	
+
 	// Call initCommands
 	initCommands()
-	
+
 	// Check that commands were added
 	commands := rootCmd.Commands()
 	assert.Greater(t, len(commands), 0)
-	
+
 	// Look for specific commands
 	var foundMint, foundList bool
 	for _, cmd := range commands {
@@ -57,10 +57,10 @@ func TestInitCommands(t *testing.T) {
 			foundList = true
 		}
 	}
-	
+
 	assert.True(t, foundMint, "mint command should be added")
 	assert.True(t, foundList, "list-idps command should be added")
-	
+
 	// Restore original commands
 	rootCmd.ResetCommands()
 	for _, cmd := range originalCommands {
@@ -72,9 +72,9 @@ func TestNewVoidkeyClientIntegration(t *testing.T) {
 	// Test that NewVoidkeyClient is called during initialization
 	httpClient := &http.Client{}
 	serverURL := "http://test.example.com"
-	
+
 	client := NewVoidkeyClient(httpClient, serverURL)
-	
+
 	assert.NotNil(t, client)
 	assert.Equal(t, httpClient, client.client)
 	assert.Equal(t, serverURL, client.serverURL)
@@ -84,13 +84,13 @@ func TestRootCommandHelp(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetArgs([]string{"--help"})
-	
+
 	// Execute help command
 	err := rootCmd.Execute()
-	
+
 	// Help command should not return an error
 	assert.NoError(t, err)
-	
+
 	output := buf.String()
 	assert.Contains(t, output, "voidkey")
 	assert.Contains(t, output, "zero-trust credential broker")
@@ -99,12 +99,12 @@ func TestRootCommandHelp(t *testing.T) {
 func TestRootCommandSubcommands(t *testing.T) {
 	// Ensure root command has expected subcommands
 	commands := rootCmd.Commands()
-	
+
 	commandNames := make([]string, len(commands))
 	for i, cmd := range commands {
 		commandNames[i] = cmd.Use
 	}
-	
+
 	// Check for expected commands (may vary based on initialization)
 	// At minimum, we expect version command to be present
 	var hasVersion bool
@@ -120,16 +120,16 @@ func TestRootCommandSubcommands(t *testing.T) {
 func TestServerURLGlobal(t *testing.T) {
 	// Test that serverURL global variable is properly initialized
 	// and can be modified by flags
-	
+
 	// Get initial value
 	initialURL := serverURL
-	
+
 	// The default should be localhost:3000
 	assert.Equal(t, "http://localhost:3000", initialURL)
-	
+
 	// Test flag parsing (simulate setting the flag)
-	rootCmd.PersistentFlags().Set("server", "http://custom.example.com")
-	
+	_ = rootCmd.PersistentFlags().Set("server", "http://custom.example.com")
+
 	// The global variable should be updated
 	assert.Contains(t, []string{"http://localhost:3000", "http://custom.example.com"}, serverURL)
 }

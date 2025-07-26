@@ -31,9 +31,9 @@ var versionCmd = &cobra.Command{
 	Short: "Show version information",
 	Long:  `Display version, commit, and build date information for the voidkey CLI.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "voidkey version %s\n", versionInfo.version)
-		fmt.Fprintf(cmd.OutOrStdout(), "commit: %s\n", versionInfo.commit)
-		fmt.Fprintf(cmd.OutOrStdout(), "built: %s\n", versionInfo.date)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "voidkey version %s\n", versionInfo.version)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "commit: %s\n", versionInfo.commit)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "built: %s\n", versionInfo.date)
 	},
 }
 

@@ -38,7 +38,7 @@ func TestSetVersionInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			SetVersionInfo(tt.version, tt.commit, tt.date)
-			
+
 			if versionInfo.version != tt.version {
 				t.Errorf("Expected version %s, got %s", tt.version, versionInfo.version)
 			}
@@ -80,7 +80,7 @@ func TestVersionCommand(t *testing.T) {
 
 			// Create a buffer to capture output
 			var buf bytes.Buffer
-			
+
 			// Create a new version command for testing
 			cmd := &cobra.Command{
 				Use:   "version",
@@ -102,11 +102,11 @@ func TestVersionCommand(t *testing.T) {
 			if !strings.Contains(output, tt.version) {
 				t.Errorf("Expected output to contain version %s, got: %s", tt.version, output)
 			}
-			
+
 			if !strings.Contains(output, tt.commit) {
 				t.Errorf("Expected output to contain commit %s, got: %s", tt.commit, output)
 			}
-			
+
 			if !strings.Contains(output, tt.date) {
 				t.Errorf("Expected output to contain date %s, got: %s", tt.date, output)
 			}
@@ -117,14 +117,14 @@ func TestVersionCommand(t *testing.T) {
 func TestVersionCommandExecution(t *testing.T) {
 	// Test that version command can be executed without errors
 	var buf bytes.Buffer
-	
+
 	// Set version info for testing
 	SetVersionInfo("1.0.0", "abc123", "2024-01-01")
-	
+
 	// Create a test command with the same output
 	testCmd := &cobra.Command{}
 	testCmd.SetOut(&buf)
-	
+
 	// Execute the version command's Run function directly
 	versionCmd.Run(testCmd, []string{})
 

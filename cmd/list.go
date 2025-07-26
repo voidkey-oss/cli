@@ -21,21 +21,21 @@ func listIdpProviders(voidkeyClient *VoidkeyClient) *cobra.Command {
 			}
 
 			if len(providers) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No Identity Providers configured")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No Identity Providers configured")
 				return nil
 			}
 
 			// Create table writer for nice formatting using command's output
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NAME\tDEFAULT")
-			fmt.Fprintln(w, "----\t-------")
+			_, _ = fmt.Fprintln(w, "NAME\tDEFAULT")
+			_, _ = fmt.Fprintln(w, "----\t-------")
 
 			for _, provider := range providers {
 				defaultIndicator := ""
 				if provider.IsDefault {
 					defaultIndicator = "✓"
 				}
-				fmt.Fprintf(w, "%s\t%s\n", provider.Name, defaultIndicator)
+				_, _ = fmt.Fprintf(w, "%s\t%s\n", provider.Name, defaultIndicator)
 			}
 
 			// Flush the table
