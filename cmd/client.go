@@ -11,6 +11,7 @@ import (
 // HTTPClient interface for dependency injection and testing
 type HTTPClient interface {
 	Post(url, contentType string, body io.Reader) (*http.Response, error)
+	Get(url string) (*http.Response, error)
 }
 
 // VoidkeyClient handles communication with the Voidkey broker server
@@ -64,4 +65,38 @@ func (c *VoidkeyClient) MintCredentials(oidcToken string, idpName string) (*Clou
 	}
 
 	return &credentials, nil
+}
+
+// IdpProvider represents an identity provider
+type IdpProvider struct {
+	Name      string `json:"name"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+// ListIdpProviders calls the broker server to list available IdP providers
+func (c *VoidkeyClient) ListIdpProviders() ([]IdpProvider, error) {
+	// Make HTTP request
+	url := fmt.Sprintf("%s/credentials/idp-providers", c.serverURL)
+	resp, err := c.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var providers []IdpProvider
+	if err := json.Unmarshal(body, &providers); err != nil {
+		return nil, fmt.Errorf("failed to parse providers response: %w", err)
+	}
+
+	return providers, nil
 }

@@ -37,7 +37,13 @@ func init() {
 }
 
 func initCommands() {
-	// Initialize mint command with dependency injection
-	mintCmd := mintCreds(NewVoidkeyClient(&http.Client{}, serverURL))
+	// Initialize client
+	client := NewVoidkeyClient(&http.Client{}, serverURL)
+	
+	// Initialize commands with dependency injection
+	mintCmd := mintCreds(client)
+	listIdpsCmd := listIdpProviders(client)
+	
 	rootCmd.AddCommand(mintCmd)
+	rootCmd.AddCommand(listIdpsCmd)
 }
