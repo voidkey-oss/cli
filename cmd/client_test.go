@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -11,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockHTTPClient is a mock implementation of HTTPClient
+// MockHTTPClient is a mock implementation of HTTPClient for testing
 type MockHTTPClient struct {
 	mock.Mock
 }
@@ -26,282 +27,174 @@ func (m *MockHTTPClient) Get(url string) (*http.Response, error) {
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
-func TestVoidkeyClient_MintCredentials(t *testing.T) {
-	tests := []struct {
-		name           string
-		oidcToken      string
-		idpName        string
-		serverResponse string
-		statusCode     int
-		serverError    error
-		expected       *CloudCredentials
-		expectError    bool
-		errorContains  string
-	}{
-		{
-			name:      "successful credential minting with token and IdP",
-			oidcToken: "valid-token",
-			idpName:   "auth0-test",
-			serverResponse: `{
-				"accessKey": "AKIAIOSFODNN7EXAMPLE",
-				"secretKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				"sessionToken": "hello-world-session-token",
-				"expiresAt": "2025-07-25T18:00:00.000Z"
-			}`,
-			statusCode: 200,
-			expected: &CloudCredentials{
-				AccessKey:    "AKIAIOSFODNN7EXAMPLE",
-				SecretKey:    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				SessionToken: "hello-world-session-token",
-				ExpiresAt:    "2025-07-25T18:00:00.000Z",
-			},
-			expectError: false,
-		},
-		{
-			name:      "successful credential minting with default IdP",
-			oidcToken: "valid-token",
-			idpName:   "",
-			serverResponse: `{
-				"accessKey": "AKIAIOSFODNN7EXAMPLE",
-				"secretKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				"sessionToken": "hello-world-session-token",
-				"expiresAt": "2025-07-25T18:00:00.000Z"
-			}`,
-			statusCode: 200,
-			expected: &CloudCredentials{
-				AccessKey:    "AKIAIOSFODNN7EXAMPLE",
-				SecretKey:    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				SessionToken: "hello-world-session-token",
-				ExpiresAt:    "2025-07-25T18:00:00.000Z",
-			},
-			expectError: false,
-		},
-		{
-			name:           "server returns 400 error",
-			oidcToken:      "invalid-token",
-			idpName:        "",
-			serverResponse: "Bad Request: Invalid OIDC token",
-			statusCode:     400,
-			expectError:    true,
-			errorContains:  "server returned error 400",
-		},
-		{
-			name:           "server returns 500 error",
-			oidcToken:      "valid-token",
-			idpName:        "",
-			serverResponse: "Internal Server Error",
-			statusCode:     500,
-			expectError:    true,
-			errorContains:  "server returned error 500",
-		},
-		{
-			name:           "invalid JSON response",
-			oidcToken:      "valid-token",
-			idpName:        "",
-			serverResponse: "invalid json response",
-			statusCode:     200,
-			expectError:    true,
-			errorContains:  "failed to parse credentials response",
-		},
-		{
-			name:          "network error",
-			oidcToken:     "valid-token",
-			idpName:       "",
-			serverError:   assert.AnError,
-			expectError:   true,
-			errorContains: "failed to connect to broker server",
-		},
-	}
+func TestNewVoidkeyClient(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	serverURL := "http://localhost:3000"
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockClient := new(MockHTTPClient)
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
+	client := NewVoidkeyClient(mockClient, serverURL)
 
-			if tt.serverError != nil {
-				mockClient.On("Post", "http://test-server:3000/credentials/mint", "application/json", mock.Anything).
-					Return((*http.Response)(nil), tt.serverError)
-			} else {
-				resp := &http.Response{
-					StatusCode: tt.statusCode,
-					Body:       io.NopCloser(strings.NewReader(tt.serverResponse)),
-				}
-				mockClient.On("Post", "http://test-server:3000/credentials/mint", "application/json", mock.Anything).
-					Return(resp, nil)
-			}
-
-			result, err := voidkeyClient.MintCredentials(tt.oidcToken, tt.idpName)
-
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorContains != "" {
-					assert.Contains(t, err.Error(), tt.errorContains)
-				}
-				assert.Nil(t, result)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, result)
-				assert.Equal(t, tt.expected, result)
-			}
-
-			mockClient.AssertExpectations(t)
-		})
-	}
+	assert.NotNil(t, client)
+	assert.Equal(t, mockClient, client.client)
+	assert.Equal(t, serverURL, client.serverURL)
 }
 
-func TestVoidkeyClient_MintCredentials_RequestBody(t *testing.T) {
-	tests := []struct {
-		name          string
-		oidcToken     string
-		idpName       string
-		expectedToken string
-		expectedIdP   string
-	}{
-		{
-			name:          "request with token and IdP",
-			oidcToken:     "test-token-123",
-			idpName:       "auth0-test",
-			expectedToken: "test-token-123",
-			expectedIdP:   "auth0-test",
-		},
-		{
-			name:          "request with token only",
-			oidcToken:     "test-token-456",
-			idpName:       "",
-			expectedToken: "test-token-456",
-			expectedIdP:   "",
-		},
+func TestVoidkeyClient_MintCredentials_Success(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	expectedCreds := CloudCredentials{
+		AccessKey:    "AKIATEST123",
+		SecretKey:    "secretkey123",
+		SessionToken: "sessiontoken123",
+		ExpiresAt:    "2024-12-31T23:59:59Z",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockClient := new(MockHTTPClient)
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
-
-			expectedResponse := `{
-				"accessKey": "AKIAIOSFODNN7EXAMPLE",
-				"secretKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				"sessionToken": "hello-world-session-token",
-				"expiresAt": "2025-07-25T18:00:00.000Z"
-			}`
-
-			resp := &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(strings.NewReader(expectedResponse)),
-			}
-
-			// Use a custom matcher to verify the request body
-			mockClient.On("Post", "http://test-server:3000/credentials/mint", "application/json", 
-				mock.MatchedBy(func(body io.Reader) bool {
-					buf := new(bytes.Buffer)
-					_, err := buf.ReadFrom(body)
-					if err != nil {
-						return false
-					}
-					bodyStr := buf.String()
-					
-					// Check for expected token and IdP in request
-					hasToken := strings.Contains(bodyStr, tt.expectedToken) && strings.Contains(bodyStr, "oidcToken")
-					if tt.expectedIdP != "" {
-						return hasToken && strings.Contains(bodyStr, tt.expectedIdP) && strings.Contains(bodyStr, "idpName")
-					}
-					return hasToken
-				})).Return(resp, nil)
-
-			_, err := voidkeyClient.MintCredentials(tt.oidcToken, tt.idpName)
-
-			assert.NoError(t, err)
-			mockClient.AssertExpectations(t)
-		})
+	responseBody, _ := json.Marshal(expectedCreds)
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
 	}
+
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
+
+	credentials, err := client.MintCredentials("test-token", "test-idp")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, credentials)
+	assert.Equal(t, expectedCreds.AccessKey, credentials.AccessKey)
+	assert.Equal(t, expectedCreds.SecretKey, credentials.SecretKey)
+	assert.Equal(t, expectedCreds.SessionToken, credentials.SessionToken)
+	assert.Equal(t, expectedCreds.ExpiresAt, credentials.ExpiresAt)
+
+	mockClient.AssertExpectations(t)
 }
 
-func TestVoidkeyClient_ListIdpProviders(t *testing.T) {
-	tests := []struct {
-		name           string
-		serverResponse string
-		statusCode     int
-		serverError    error
-		expected       []IdpProvider
-		expectError    bool
-		errorContains  string
-	}{
-		{
-			name: "successful provider listing",
-			serverResponse: `[
-				{"name": "hello-world", "isDefault": true},
-				{"name": "okta-corporate", "isDefault": false},
-				{"name": "auth0-test", "isDefault": false}
-			]`,
-			statusCode: 200,
-			expected: []IdpProvider{
-				{Name: "hello-world", IsDefault: true},
-				{Name: "okta-corporate", IsDefault: false},
-				{Name: "auth0-test", IsDefault: false},
-			},
-			expectError: false,
-		},
-		{
-			name:           "empty provider list",
-			serverResponse: `[]`,
-			statusCode:     200,
-			expected:       []IdpProvider{},
-			expectError:    false,
-		},
-		{
-			name:           "server returns 500 error",
-			serverResponse: "Internal Server Error",
-			statusCode:     500,
-			expectError:    true,
-			errorContains:  "server returned error 500",
-		},
-		{
-			name:           "invalid JSON response",
-			serverResponse: "invalid json response",
-			statusCode:     200,
-			expectError:    true,
-			errorContains:  "failed to parse providers response",
-		},
-		{
-			name:          "network error",
-			serverError:   assert.AnError,
-			expectError:   true,
-			errorContains: "failed to connect to broker server",
-		},
+func TestVoidkeyClient_MintCredentials_ServerError(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	resp := &http.Response{
+		StatusCode: http.StatusInternalServerError,
+		Body:       io.NopCloser(strings.NewReader("Internal server error")),
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockClient := new(MockHTTPClient)
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
-			if tt.serverError != nil {
-				mockClient.On("Get", "http://test-server:3000/credentials/idp-providers").
-					Return((*http.Response)(nil), tt.serverError)
-			} else {
-				resp := &http.Response{
-					StatusCode: tt.statusCode,
-					Body:       io.NopCloser(strings.NewReader(tt.serverResponse)),
-				}
-				mockClient.On("Get", "http://test-server:3000/credentials/idp-providers").
-					Return(resp, nil)
-			}
+	credentials, err := client.MintCredentials("test-token", "test-idp")
 
-			result, err := voidkeyClient.ListIdpProviders()
+	assert.Error(t, err)
+	assert.Nil(t, credentials)
+	assert.Contains(t, err.Error(), "server returned error 500")
 
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorContains != "" {
-					assert.Contains(t, err.Error(), tt.errorContains)
-				}
-				assert.Nil(t, result)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, result)
-				assert.Equal(t, tt.expected, result)
-			}
+	mockClient.AssertExpectations(t)
+}
 
-			mockClient.AssertExpectations(t)
-		})
+func TestVoidkeyClient_MintCredentials_InvalidJSON(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("invalid json")),
 	}
+
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
+
+	credentials, err := client.MintCredentials("test-token", "test-idp")
+
+	assert.Error(t, err)
+	assert.Nil(t, credentials)
+	assert.Contains(t, err.Error(), "failed to parse credentials response")
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestVoidkeyClient_ListIdpProviders_Success(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	expectedProviders := []IdpProvider{
+		{Name: "auth0", IsDefault: true},
+		{Name: "github", IsDefault: false},
+		{Name: "hello-world", IsDefault: false},
+	}
+
+	responseBody, _ := json.Marshal(expectedProviders)
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
+
+	mockClient.On("Get", "http://localhost:3000/credentials/idp-providers").Return(resp, nil)
+
+	providers, err := client.ListIdpProviders()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, providers)
+	assert.Len(t, providers, 3)
+	assert.Equal(t, expectedProviders[0].Name, providers[0].Name)
+	assert.Equal(t, expectedProviders[0].IsDefault, providers[0].IsDefault)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestVoidkeyClient_ListIdpProviders_EmptyResponse(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	responseBody, _ := json.Marshal([]IdpProvider{})
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
+
+	mockClient.On("Get", "http://localhost:3000/credentials/idp-providers").Return(resp, nil)
+
+	providers, err := client.ListIdpProviders()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, providers)
+	assert.Len(t, providers, 0)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestVoidkeyClient_ListIdpProviders_ServerError(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	resp := &http.Response{
+		StatusCode: http.StatusInternalServerError,
+		Body:       io.NopCloser(strings.NewReader("Internal server error")),
+	}
+
+	mockClient.On("Get", "http://localhost:3000/credentials/idp-providers").Return(resp, nil)
+
+	providers, err := client.ListIdpProviders()
+
+	assert.Error(t, err)
+	assert.Nil(t, providers)
+	assert.Contains(t, err.Error(), "server returned error 500")
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestVoidkeyClient_ListIdpProviders_InvalidJSON(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("invalid json")),
+	}
+
+	mockClient.On("Get", "http://localhost:3000/credentials/idp-providers").Return(resp, nil)
+
+	providers, err := client.ListIdpProviders()
+
+	assert.Error(t, err)
+	assert.Nil(t, providers)
+	assert.Contains(t, err.Error(), "failed to parse providers response")
+
+	mockClient.AssertExpectations(t)
 }

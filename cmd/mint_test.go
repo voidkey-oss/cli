@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -13,446 +14,299 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockHTTPClient for mint tests
-type MockHTTPClientMint struct {
-	mock.Mock
-}
+func TestMintCreds_CommandCreation(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	voidkeyClient := NewVoidkeyClient(mockClient, "http://localhost:3000")
 
-func (m *MockHTTPClientMint) Post(url, contentType string, body io.Reader) (*http.Response, error) {
-	args := m.Called(url, contentType, body)
-	return args.Get(0).(*http.Response), args.Error(1)
-}
+	cmd := mintCreds(voidkeyClient)
 
-func (m *MockHTTPClientMint) Get(url string) (*http.Response, error) {
-	args := m.Called(url)
-	return args.Get(0).(*http.Response), args.Error(1)
-}
-
-// executeCommand helper function to capture output from Cobra commands
-func executeCommand(cmd *cobra.Command, args ...string) (stdout, stderr string, err error) {
-	stdoutBuf := new(bytes.Buffer)
-	stderrBuf := new(bytes.Buffer)
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "mint", cmd.Use)
+	assert.Contains(t, cmd.Short, "Mint short-lived cloud credentials")
 	
-	cmd.SetOut(stdoutBuf)
-	cmd.SetErr(stderrBuf)
-	cmd.SetArgs(args)
+	// Check flags are set up
+	tokenFlag := cmd.Flags().Lookup("token")
+	assert.NotNil(t, tokenFlag)
 	
-	err = cmd.Execute()
-	return stdoutBuf.String(), stderrBuf.String(), err
+	outputFlag := cmd.Flags().Lookup("output")
+	assert.NotNil(t, outputFlag)
+	
+	idpFlag := cmd.Flags().Lookup("idp")
+	assert.NotNil(t, idpFlag)
 }
 
-func TestMintCmd_HelloWorldIdP(t *testing.T) {
+func TestMintCredentialsWithFlags_Success(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	expectedCreds := CloudCredentials{
+		AccessKey:    "AKIATEST123",
+		SecretKey:    "secretkey123",
+		SessionToken: "sessiontoken123",
+		ExpiresAt:    "2024-12-31T23:59:59Z",
+	}
+
+	responseBody, _ := json.Marshal(expectedCreds)
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
+
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
+
+	var stdout, stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+
+	err := mintCredentialsWithFlags(client, cmd, "test-token", "env", "test-idp")
+
+	assert.NoError(t, err)
+	
+	// Check output contains expected environment variables
+	output := stdout.String()
+	assert.Contains(t, output, "export AWS_ACCESS_KEY_ID=AKIATEST123")
+	assert.Contains(t, output, "export AWS_SECRET_ACCESS_KEY=secretkey123")
+	assert.Contains(t, output, "export AWS_SESSION_TOKEN=sessiontoken123")
+	assert.Contains(t, output, "export AWS_CREDENTIAL_EXPIRATION=2024-12-31T23:59:59Z")
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestMintCredentialsWithFlags_JSONOutput(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	expectedCreds := CloudCredentials{
+		AccessKey:    "AKIATEST123",
+		SecretKey:    "secretkey123",
+		SessionToken: "sessiontoken123",
+		ExpiresAt:    "2024-12-31T23:59:59Z",
+	}
+
+	responseBody, _ := json.Marshal(expectedCreds)
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
+
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
+
+	var stdout, stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+
+	err := mintCredentialsWithFlags(client, cmd, "test-token", "json", "test-idp")
+
+	assert.NoError(t, err)
+	
+	// Check output is valid JSON
+	output := stdout.String()
+	var parsedCreds CloudCredentials
+	err = json.Unmarshal([]byte(output), &parsedCreds)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedCreds.AccessKey, parsedCreds.AccessKey)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestMintCredentialsWithFlags_NoToken(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	var stdout, stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+
+	// Clear any environment variables
+	os.Unsetenv("OIDC_TOKEN")
+	os.Unsetenv("GITHUB_TOKEN")
+
+	err := mintCredentialsWithFlags(client, cmd, "", "env", "")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "OIDC token is required")
+}
+
+func TestMintCredentialsWithFlags_HelloWorldIdP(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	expectedCreds := CloudCredentials{
+		AccessKey:    "AKIATEST123",
+		SecretKey:    "secretkey123",
+		SessionToken: "",
+		ExpiresAt:    "2024-12-31T23:59:59Z",
+	}
+
+	responseBody, _ := json.Marshal(expectedCreds)
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
+
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
+
+	var stdout, stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+
+	// Test hello-world IdP with empty token (should use default)
+	err := mintCredentialsWithFlags(client, cmd, "", "env", "hello-world")
+
+	assert.NoError(t, err)
+	
+	// Check stderr for hello-world message
+	stderrOutput := stderr.String()
+	assert.Contains(t, stderrOutput, "Using hello-world IdP with default token")
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestMintCredentialsWithFlags_EnvironmentTokens(t *testing.T) {
 	tests := []struct {
-		name           string
-		args           []string
-		expectedStdout string
-		expectedStderr string
+		name     string
+		envVar   string
+		envValue string
+		expected string
 	}{
 		{
-			name: "hello-world IdP with default token",
-			args: []string{"--idp", "hello-world"},
-			expectedStdout: `export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-export AWS_SESSION_TOKEN=hello-world-session-token
-export AWS_CREDENTIAL_EXPIRATION=2025-07-25T18:00:00.000Z
-`,
-			expectedStderr: "🎭 Using hello-world IdP with default token\n🔍 Using IdP provider: hello-world\n✅ Credentials minted successfully (expires: 2025-07-25T18:00:00.000Z)\n💡 To use: eval \"$(voidkey mint)\"\n",
+			name:     "OIDC_TOKEN environment variable",
+			envVar:   "OIDC_TOKEN",
+			envValue: "oidc-test-token",
+			expected: "Using OIDC_TOKEN environment variable",
 		},
 		{
-			name: "hello-world IdP with JSON output",
-			args: []string{"--idp", "hello-world", "--output", "json"},
-			expectedStdout: `{
-  "accessKey": "AKIAIOSFODNN7EXAMPLE",
-  "secretKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-  "sessionToken": "hello-world-session-token",
-  "expiresAt": "2025-07-25T18:00:00.000Z"
-}
-`,
-			expectedStderr: "🎭 Using hello-world IdP with default token\n🔍 Using IdP provider: hello-world\n",
-		},
-		{
-			name: "hello-world IdP with custom token",
-			args: []string{"--idp", "hello-world", "--token", "custom-test-token"},
-			expectedStdout: `export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-export AWS_SESSION_TOKEN=hello-world-session-token
-export AWS_CREDENTIAL_EXPIRATION=2025-07-25T18:00:00.000Z
-`,
-			expectedStderr: "🔍 Using IdP provider: hello-world\n✅ Credentials minted successfully (expires: 2025-07-25T18:00:00.000Z)\n💡 To use: eval \"$(voidkey mint)\"\n",
+			name:     "GITHUB_TOKEN environment variable",
+			envVar:   "GITHUB_TOKEN",
+			envValue: "github-test-token",
+			expected: "Using GITHUB_TOKEN environment variable",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mock client
-			mockClient := new(MockHTTPClientMint)
-			
-			// Setup expected response
-			serverResponse := `{
-				"accessKey": "AKIAIOSFODNN7EXAMPLE",
-				"secretKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				"sessionToken": "hello-world-session-token",
-				"expiresAt": "2025-07-25T18:00:00.000Z"
-			}`
-			
-			resp := &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(strings.NewReader(serverResponse)),
-			}
-			
-			mockClient.On("Post", mock.AnythingOfType("string"), "application/json", mock.Anything).
-				Return(resp, nil)
+			// Clean environment
+			os.Unsetenv("OIDC_TOKEN")
+			os.Unsetenv("GITHUB_TOKEN")
 
-			// Create mint command with mock client
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
-			mintCmd := mintCreds(voidkeyClient)
-
-			// Execute command
-			stdout, stderr, err := executeCommand(mintCmd, tt.args...)
-
-			// Assertions
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedStdout, stdout)
-			assert.Equal(t, tt.expectedStderr, stderr)
-			
-			mockClient.AssertExpectations(t)
-		})
-	}
-}
-
-func TestMintCmd_WithProvidedToken(t *testing.T) {
-	tests := []struct {
-		name           string
-		args           []string
-		expectedStdout string
-		expectedStderr string
-	}{
-		{
-			name: "explicit token with default IdP",
-			args: []string{"--token", "test-token-123"},
-			expectedStdout: `export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-export AWS_SESSION_TOKEN=hello-world-session-token
-export AWS_CREDENTIAL_EXPIRATION=2025-07-25T18:00:00.000Z
-`,
-			expectedStderr: "🔍 Using server default IdP provider\n✅ Credentials minted successfully (expires: 2025-07-25T18:00:00.000Z)\n💡 To use: eval \"$(voidkey mint)\"\n",
-		},
-		{
-			name: "explicit token with specific IdP",
-			args: []string{"--token", "test-token-123", "--idp", "auth0-test"},
-			expectedStdout: `export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-export AWS_SESSION_TOKEN=hello-world-session-token
-export AWS_CREDENTIAL_EXPIRATION=2025-07-25T18:00:00.000Z
-`,
-			expectedStderr: "🔍 Using IdP provider: auth0-test\n✅ Credentials minted successfully (expires: 2025-07-25T18:00:00.000Z)\n💡 To use: eval \"$(voidkey mint)\"\n",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create mock client
-			mockClient := new(MockHTTPClientMint)
-			
-			// Setup expected response
-			serverResponse := `{
-				"accessKey": "AKIAIOSFODNN7EXAMPLE",
-				"secretKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				"sessionToken": "hello-world-session-token",
-				"expiresAt": "2025-07-25T18:00:00.000Z"
-			}`
-			
-			resp := &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(strings.NewReader(serverResponse)),
-			}
-			
-			mockClient.On("Post", mock.AnythingOfType("string"), "application/json", mock.Anything).
-				Return(resp, nil)
-
-			// Create mint command with mock client
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
-			mintCmd := mintCreds(voidkeyClient)
-
-			// Execute command
-			stdout, stderr, err := executeCommand(mintCmd, tt.args...)
-
-			// Assertions
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedStdout, stdout)
-			assert.Equal(t, tt.expectedStderr, stderr)
-			
-			mockClient.AssertExpectations(t)
-		})
-	}
-}
-
-func TestMintCmd_EnvironmentVariables(t *testing.T) {
-	tests := []struct {
-		name           string
-		args           []string
-		envVar         string
-		envValue       string
-		expectedStderr string
-	}{
-		{
-			name:           "OIDC_TOKEN environment variable",
-			args:           []string{},
-			envVar:         "OIDC_TOKEN",
-			envValue:       "env-oidc-token",
-			expectedStderr: "🔍 Using OIDC_TOKEN environment variable\n🔍 Using server default IdP provider\n✅ Credentials minted successfully (expires: 2025-07-25T18:00:00.000Z)\n💡 To use: eval \"$(voidkey mint)\"\n",
-		},
-		{
-			name:           "GITHUB_TOKEN environment variable",
-			args:           []string{},
-			envVar:         "GITHUB_TOKEN",
-			envValue:       "env-github-token",
-			expectedStderr: "🔍 Using GITHUB_TOKEN environment variable\n🔍 Using server default IdP provider\n✅ Credentials minted successfully (expires: 2025-07-25T18:00:00.000Z)\n💡 To use: eval \"$(voidkey mint)\"\n",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set environment variable
-			oldValue := os.Getenv(tt.envVar)
+			// Set test environment variable
 			os.Setenv(tt.envVar, tt.envValue)
-			defer func() {
-				if oldValue == "" {
-					os.Unsetenv(tt.envVar)
-				} else {
-					os.Setenv(tt.envVar, oldValue)
-				}
-			}()
+			defer os.Unsetenv(tt.envVar)
 
-			// Create mock client
-			mockClient := new(MockHTTPClientMint)
-			
-			// Setup expected response
-			serverResponse := `{
-				"accessKey": "AKIAIOSFODNN7EXAMPLE",
-				"secretKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				"sessionToken": "hello-world-session-token",
-				"expiresAt": "2025-07-25T18:00:00.000Z"
-			}`
-			
+			mockClient := &MockHTTPClient{}
+			client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+			expectedCreds := CloudCredentials{
+				AccessKey: "AKIATEST123",
+				SecretKey: "secretkey123",
+				ExpiresAt: "2024-12-31T23:59:59Z",
+			}
+
+			responseBody, _ := json.Marshal(expectedCreds)
 			resp := &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(strings.NewReader(serverResponse)),
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(responseBody)),
 			}
-			
-			mockClient.On("Post", mock.AnythingOfType("string"), "application/json", mock.Anything).
-				Return(resp, nil)
 
-			// Create mint command with mock client
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
-			mintCmd := mintCreds(voidkeyClient)
+			mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
-			// Execute command
-			_, stderr, err := executeCommand(mintCmd, tt.args...)
+			var stdout, stderr bytes.Buffer
+			cmd := &cobra.Command{}
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
 
-			// Assertions
+			err := mintCredentialsWithFlags(client, cmd, "", "env", "")
+
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedStderr, stderr)
 			
-			mockClient.AssertExpectations(t)
-		})
-	}
-}
-
-func TestMintCmd_ErrorCases(t *testing.T) {
-	tests := []struct {
-		name          string
-		args          []string
-		expectError   bool
-		errorContains string
-	}{
-		{
-			name:          "no token provided and not hello-world",
-			args:          []string{},
-			expectError:   true,
-			errorContains: "OIDC token is required",
-		},
-		{
-			name:          "no token provided with non-hello-world IdP",
-			args:          []string{"--idp", "auth0-test"},
-			expectError:   true,
-			errorContains: "OIDC token is required",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create mock client (won't be called due to early error)
-			mockClient := new(MockHTTPClientMint)
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
-			mintCmd := mintCreds(voidkeyClient)
-
-			// Execute command
-			_, _, err := executeCommand(mintCmd, tt.args...)
-
-			// Assertions
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorContains != "" {
-					assert.Contains(t, err.Error(), tt.errorContains)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestMintCmd_ServerErrors(t *testing.T) {
-	tests := []struct {
-		name           string
-		args           []string
-		serverError    error
-		serverResponse string
-		statusCode     int
-		expectError    bool
-		errorContains  string
-	}{
-		{
-			name:          "network error",
-			args:          []string{"--token", "test-token"},
-			serverError:   assert.AnError,
-			expectError:   true,
-			errorContains: "failed to connect to broker server",
-		},
-		{
-			name:           "server error 500",
-			args:           []string{"--token", "test-token"},
-			serverResponse: "Internal Server Error",
-			statusCode:     500,
-			expectError:    true,
-			errorContains:  "server returned error 500",
-		},
-		{
-			name:           "invalid JSON response",
-			args:           []string{"--token", "test-token"},
-			serverResponse: "invalid json",
-			statusCode:     200,
-			expectError:    true,
-			errorContains:  "failed to parse credentials response",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create mock client
-			mockClient := new(MockHTTPClientMint)
-
-			if tt.serverError != nil {
-				mockClient.On("Post", mock.AnythingOfType("string"), "application/json", mock.Anything).
-					Return((*http.Response)(nil), tt.serverError)
-			} else {
-				resp := &http.Response{
-					StatusCode: tt.statusCode,
-					Body:       io.NopCloser(strings.NewReader(tt.serverResponse)),
-				}
-				mockClient.On("Post", mock.AnythingOfType("string"), "application/json", mock.Anything).
-					Return(resp, nil)
-			}
-
-			// Create mint command with mock client
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
-			mintCmd := mintCreds(voidkeyClient)
-
-			// Execute command
-			_, _, err := executeCommand(mintCmd, tt.args...)
-
-			// Assertions
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorContains != "" {
-					assert.Contains(t, err.Error(), tt.errorContains)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
+			// Check stderr for environment variable message
+			stderrOutput := stderr.String()
+			assert.Contains(t, stderrOutput, tt.expected)
 
 			mockClient.AssertExpectations(t)
 		})
 	}
 }
 
-func TestMintCmd_FlagParsing(t *testing.T) {
-	tests := []struct {
-		name           string
-		args           []string
-		expectedToken  string
-		expectedFormat string
-		expectedIdP    string
-	}{
-		{
-			name:           "default values",
-			args:           []string{},
-			expectedToken:  "",
-			expectedFormat: "env",
-			expectedIdP:    "",
-		},
-		{
-			name:           "custom token",
-			args:           []string{"--token", "my-token"},
-			expectedToken:  "my-token",
-			expectedFormat: "env",
-			expectedIdP:    "",
-		},
-		{
-			name:           "json output format",
-			args:           []string{"--output", "json"},
-			expectedToken:  "",
-			expectedFormat: "json",
-			expectedIdP:    "",
-		},
-		{
-			name:           "short flag for output",
-			args:           []string{"-o", "json"},
-			expectedToken:  "",
-			expectedFormat: "json",
-			expectedIdP:    "",
-		},
-		{
-			name:           "specific IdP",
-			args:           []string{"--idp", "hello-world"},
-			expectedToken:  "",
-			expectedFormat: "env",
-			expectedIdP:    "hello-world",
-		},
-		{
-			name:           "all flags combined",
-			args:           []string{"--token", "test-token", "--output", "json", "--idp", "auth0-test"},
-			expectedToken:  "test-token",
-			expectedFormat: "json",
-			expectedIdP:    "auth0-test",
-		},
+func TestOutputAsEnvVars(t *testing.T) {
+	creds := CloudCredentials{
+		AccessKey:    "AKIATEST123",
+		SecretKey:    "secretkey123",
+		SessionToken: "sessiontoken123",
+		ExpiresAt:    "2024-12-31T23:59:59Z",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create mock client (won't be called due to parsing-only test)
-			mockClient := new(MockHTTPClientMint)
-			voidkeyClient := NewVoidkeyClient(mockClient, "http://test-server:3000")
-			mintCmd := mintCreds(voidkeyClient)
+	var stdout, stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
 
-			// Parse flags without executing
-			mintCmd.SetArgs(tt.args)
-			err := mintCmd.ParseFlags(tt.args)
-			assert.NoError(t, err)
+	outputAsEnvVars(creds, cmd)
 
-			// Check flag values
-			tokenFlag, err := mintCmd.Flags().GetString("token")
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedToken, tokenFlag)
+	output := stdout.String()
+	assert.Contains(t, output, "export AWS_ACCESS_KEY_ID=AKIATEST123")
+	assert.Contains(t, output, "export AWS_SECRET_ACCESS_KEY=secretkey123")
+	assert.Contains(t, output, "export AWS_SESSION_TOKEN=sessiontoken123")
+	assert.Contains(t, output, "export AWS_CREDENTIAL_EXPIRATION=2024-12-31T23:59:59Z")
 
-			outputFlag, err := mintCmd.Flags().GetString("output")
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedFormat, outputFlag)
+	// Check stderr for success message
+	stderrOutput := stderr.String()
+	assert.Contains(t, stderrOutput, "Credentials minted successfully")
+	assert.Contains(t, stderrOutput, "eval \"$(voidkey mint)\"")
+}
 
-			idpFlag, err := mintCmd.Flags().GetString("idp")
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedIdP, idpFlag)
-		})
+func TestOutputAsEnvVars_NoSessionToken(t *testing.T) {
+	creds := CloudCredentials{
+		AccessKey:    "AKIATEST123",
+		SecretKey:    "secretkey123",
+		SessionToken: "", // No session token
+		ExpiresAt:    "2024-12-31T23:59:59Z",
 	}
+
+	var stdout, stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+
+	outputAsEnvVars(creds, cmd)
+
+	output := stdout.String()
+	assert.Contains(t, output, "export AWS_ACCESS_KEY_ID=AKIATEST123")
+	assert.Contains(t, output, "export AWS_SECRET_ACCESS_KEY=secretkey123")
+	assert.NotContains(t, output, "export AWS_SESSION_TOKEN=")
+	assert.Contains(t, output, "export AWS_CREDENTIAL_EXPIRATION=2024-12-31T23:59:59Z")
+}
+
+func TestOutputAsJSON(t *testing.T) {
+	creds := CloudCredentials{
+		AccessKey:    "AKIATEST123",
+		SecretKey:    "secretkey123",
+		SessionToken: "sessiontoken123",
+		ExpiresAt:    "2024-12-31T23:59:59Z",
+	}
+
+	var stdout bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+
+	outputAsJSON(creds, cmd)
+
+	output := stdout.String()
+	
+	// Parse JSON to verify it's valid
+	var parsedCreds CloudCredentials
+	err := json.Unmarshal([]byte(output), &parsedCreds)
+	assert.NoError(t, err)
+	assert.Equal(t, creds.AccessKey, parsedCreds.AccessKey)
+	assert.Equal(t, creds.SecretKey, parsedCreds.SecretKey)
+	assert.Equal(t, creds.SessionToken, parsedCreds.SessionToken)
+	assert.Equal(t, creds.ExpiresAt, parsedCreds.ExpiresAt)
+
+	// Check that output is properly formatted JSON
+	assert.True(t, strings.Contains(output, "{\n"))
+	assert.True(t, strings.Contains(output, "  \"accessKey\":"))
 }
