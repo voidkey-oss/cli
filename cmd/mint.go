@@ -189,7 +189,7 @@ func outputAsEnvVars(creds CloudCredentials, keysetVars map[string]string, cmd *
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "export AWS_CREDENTIAL_EXPIRATION=%s\n", creds.ExpiresAt)
 
 	// If keyset variables are available, output them as well
-	if keysetVars != nil && len(keysetVars) > 0 {
+	if len(keysetVars) > 0 {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "🔑 Setting keyset environment variables:\n")
 		for envVar, value := range keysetVars {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "export %s=%s\n", envVar, value)

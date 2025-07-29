@@ -158,7 +158,7 @@ func showKeysetCmd(voidkeyClient *VoidkeyClient) *cobra.Command {
 	cmd.Flags().StringVar(&token, "token", "", "OIDC token to extract subject from and query")
 	cmd.Flags().StringVar(&keysetName, "keyset", "", "Keyset name to show")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "Output format (table|json|env)")
-	cmd.MarkFlagRequired("keyset")
+	_ = cmd.MarkFlagRequired("keyset")
 
 	return cmd
 }
