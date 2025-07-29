@@ -29,11 +29,12 @@ func NewVoidkeyClient(client HTTPClient, serverURL string) *VoidkeyClient {
 }
 
 // MintCredentials calls the broker server to mint credentials
-func (c *VoidkeyClient) MintCredentials(oidcToken string, idpName string) (*CloudCredentials, error) {
+func (c *VoidkeyClient) MintCredentials(oidcToken string, idpName string, keyset string) (*CloudCredentials, error) {
 	// Prepare request
 	reqBody := MintRequest{
 		OidcToken: oidcToken,
 		IdpName:   idpName,
+		Keyset:    keyset,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -103,4 +104,124 @@ func (c *VoidkeyClient) ListIdpProviders() ([]IdpProvider, error) {
 	}
 
 	return providers, nil
+}
+
+// GetAvailableKeysets calls the broker server to get available keysets for a subject
+func (c *VoidkeyClient) GetAvailableKeysets(subject string) (map[string]map[string]string, error) {
+	// Make HTTP request
+	url := fmt.Sprintf("%s/credentials/keysets?subject=%s", c.serverURL, subject)
+	resp, err := c.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var keysets map[string]map[string]string
+	if err := json.Unmarshal(body, &keysets); err != nil {
+		return nil, fmt.Errorf("failed to parse keysets response: %w", err)
+	}
+
+	return keysets, nil
+}
+
+// GetKeysetKeys calls the broker server to get keys for a specific keyset
+func (c *VoidkeyClient) GetKeysetKeys(subject string, keysetName string) (map[string]string, error) {
+	// Make HTTP request
+	url := fmt.Sprintf("%s/credentials/keysets/keys?subject=%s&keyset=%s", c.serverURL, subject, keysetName)
+	resp, err := c.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var keys map[string]string
+	if err := json.Unmarshal(body, &keys); err != nil {
+		return nil, fmt.Errorf("failed to parse keys response: %w", err)
+	}
+
+	return keys, nil
+}
+
+// GetAvailableKeysetsWithToken calls the broker server to get available keysets using a token
+func (c *VoidkeyClient) GetAvailableKeysetsWithToken(token string) (map[string]map[string]string, error) {
+	// Make HTTP request
+	url := fmt.Sprintf("%s/credentials/keysets?token=%s", c.serverURL, token)
+	resp, err := c.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var keysets map[string]map[string]string
+	if err := json.Unmarshal(body, &keysets); err != nil {
+		return nil, fmt.Errorf("failed to parse keysets response: %w", err)
+	}
+
+	return keysets, nil
+}
+
+// GetKeysetKeysWithToken calls the broker server to get keys for a specific keyset using a token
+func (c *VoidkeyClient) GetKeysetKeysWithToken(token string, keysetName string) (map[string]string, error) {
+	// Make HTTP request
+	url := fmt.Sprintf("%s/credentials/keysets/keys?token=%s&keyset=%s", c.serverURL, token, keysetName)
+	resp, err := c.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var keys map[string]string
+	if err := json.Unmarshal(body, &keys); err != nil {
+		return nil, fmt.Errorf("failed to parse keys response: %w", err)
+	}
+
+	return keys, nil
 }

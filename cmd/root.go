@@ -43,7 +43,9 @@ func initCommands() {
 	// Initialize commands with dependency injection
 	mintCmd := mintCreds(client)
 	listIdpsCmd := listIdpProviders(client)
+	keysetsCmd := keysetsCmd(client)
 
 	rootCmd.AddCommand(mintCmd)
 	rootCmd.AddCommand(listIdpsCmd)
+	rootCmd.AddCommand(keysetsCmd)
 }

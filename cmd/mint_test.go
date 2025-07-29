@@ -59,7 +59,7 @@ func TestMintCredentialsWithFlags_Success(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 
-	err := mintCredentialsWithFlags(client, cmd, "test-token", "env", "test-idp")
+	err := mintCredentialsWithFlags(client, cmd, "test-token", "env", "test-idp", "")
 
 	assert.NoError(t, err)
 
@@ -97,7 +97,7 @@ func TestMintCredentialsWithFlags_JSONOutput(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 
-	err := mintCredentialsWithFlags(client, cmd, "test-token", "json", "test-idp")
+	err := mintCredentialsWithFlags(client, cmd, "test-token", "json", "test-idp", "")
 
 	assert.NoError(t, err)
 
@@ -124,7 +124,7 @@ func TestMintCredentialsWithFlags_NoToken(t *testing.T) {
 	_ = os.Unsetenv("OIDC_TOKEN")
 	_ = os.Unsetenv("GITHUB_TOKEN")
 
-	err := mintCredentialsWithFlags(client, cmd, "", "env", "")
+	err := mintCredentialsWithFlags(client, cmd, "", "env", "", "")
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "OIDC token is required")
@@ -155,7 +155,7 @@ func TestMintCredentialsWithFlags_HelloWorldIdP(t *testing.T) {
 	cmd.SetErr(&stderr)
 
 	// Test hello-world IdP with empty token (should use default)
-	err := mintCredentialsWithFlags(client, cmd, "", "env", "hello-world")
+	err := mintCredentialsWithFlags(client, cmd, "", "env", "hello-world", "")
 
 	assert.NoError(t, err)
 
@@ -219,7 +219,7 @@ func TestMintCredentialsWithFlags_EnvironmentTokens(t *testing.T) {
 			cmd.SetOut(&stdout)
 			cmd.SetErr(&stderr)
 
-			err := mintCredentialsWithFlags(client, cmd, "", "env", "")
+			err := mintCredentialsWithFlags(client, cmd, "", "env", "", "")
 
 			assert.NoError(t, err)
 
@@ -245,7 +245,7 @@ func TestOutputAsEnvVars(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 
-	outputAsEnvVars(creds, cmd)
+	outputAsEnvVars(creds, nil, cmd)
 
 	output := stdout.String()
 	assert.Contains(t, output, "export AWS_ACCESS_KEY_ID=AKIATEST123")
@@ -272,7 +272,7 @@ func TestOutputAsEnvVars_NoSessionToken(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 
-	outputAsEnvVars(creds, cmd)
+	outputAsEnvVars(creds, nil, cmd)
 
 	output := stdout.String()
 	assert.Contains(t, output, "export AWS_ACCESS_KEY_ID=AKIATEST123")
@@ -309,4 +309,58 @@ func TestOutputAsJSON(t *testing.T) {
 	// Check that output is properly formatted JSON
 	assert.True(t, strings.Contains(output, "{\n"))
 	assert.True(t, strings.Contains(output, "  \"accessKey\":"))
+}
+
+func TestMintCredentialsWithFlags_WithKeyset(t *testing.T) {
+	mockClient := &MockHTTPClient{}
+	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
+
+	expectedCreds := CloudCredentials{
+		AccessKey:    "AKIATEST123",
+		SecretKey:    "secretkey123",
+		SessionToken: "sessiontoken123",
+		ExpiresAt:    "2023-06-01T12:00:00Z",
+	}
+
+	credResponseBody, _ := json.Marshal(expectedCreds)
+	credResp := &http.Response{
+		StatusCode: 200,
+		Body:       io.NopCloser(bytes.NewReader(credResponseBody)),
+	}
+
+	keysetKeys := map[string]string{
+		"MINIO_ADMIN_ROLE": "minio:admin",
+		"ACCESS_LEVEL":     "admin",
+	}
+	keysetResponseBody, _ := json.Marshal(keysetKeys)
+	keysetResp := &http.Response{
+		StatusCode: 200,
+		Body:       io.NopCloser(bytes.NewReader(keysetResponseBody)),
+	}
+
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(credResp, nil)
+	mockClient.On("Get", "http://localhost:3000/credentials/keysets/keys?token=test-token&keyset=admin").Return(keysetResp, nil)
+
+	var stdout, stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+
+	err := mintCredentialsWithFlags(client, cmd, "test-token", "env", "test-idp", "admin")
+
+	assert.NoError(t, err)
+
+	// Check standard AWS credentials in output
+	assert.Contains(t, stdout.String(), "export AWS_ACCESS_KEY_ID=AKIATEST123")
+	assert.Contains(t, stdout.String(), "export AWS_SECRET_ACCESS_KEY=secretkey123")
+	
+	// Check keyset environment variables in output
+	assert.Contains(t, stdout.String(), "export MINIO_ADMIN_ROLE=minio:admin")
+	assert.Contains(t, stdout.String(), "export ACCESS_LEVEL=admin")
+
+	// Check keyset info in stderr
+	assert.Contains(t, stderr.String(), "🔑 Using keyset: admin")
+	assert.Contains(t, stderr.String(), "🔑 Setting keyset environment variables")
+	assert.Contains(t, stderr.String(), "MINIO_ADMIN_ROLE=minio:admin")
+	assert.Contains(t, stderr.String(), "ACCESS_LEVEL=admin")
 }

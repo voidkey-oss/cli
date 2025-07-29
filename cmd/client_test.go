@@ -57,7 +57,7 @@ func TestVoidkeyClient_MintCredentials_Success(t *testing.T) {
 
 	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
-	credentials, err := client.MintCredentials("test-token", "test-idp")
+	credentials, err := client.MintCredentials("test-token", "test-idp", "")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, credentials)
@@ -80,7 +80,7 @@ func TestVoidkeyClient_MintCredentials_ServerError(t *testing.T) {
 
 	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
-	credentials, err := client.MintCredentials("test-token", "test-idp")
+	credentials, err := client.MintCredentials("test-token", "test-idp", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, credentials)
@@ -100,7 +100,7 @@ func TestVoidkeyClient_MintCredentials_InvalidJSON(t *testing.T) {
 
 	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
-	credentials, err := client.MintCredentials("test-token", "test-idp")
+	credentials, err := client.MintCredentials("test-token", "test-idp", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, credentials)
