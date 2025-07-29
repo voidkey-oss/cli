@@ -11,9 +11,9 @@ import (
 type MintRequest struct {
 	OidcToken string   `json:"oidcToken"`
 	IdpName   string   `json:"idpName,omitempty"`
-	Keyset    string   `json:"keyset,omitempty"`    // Legacy - for backward compatibility
-	Keys      []string `json:"keys,omitempty"`      // New key-based approach
-	Duration  int      `json:"duration,omitempty"`  // Optional duration override
+	Keyset    string   `json:"keyset,omitempty"`   // Legacy - for backward compatibility
+	Keys      []string `json:"keys,omitempty"`     // New key-based approach
+	Duration  int      `json:"duration,omitempty"` // Optional duration override
 }
 
 type CloudCredentials struct {
@@ -122,7 +122,7 @@ func mintCredentialsWithFlags(client *VoidkeyClient, cmd *cobra.Command, token, 
 		} else {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "🔑 Minting keys: %v\n", keys)
 		}
-		
+
 		if duration > 0 {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "⏱️ Duration override: %d seconds\n", duration)
 		}
@@ -210,16 +210,16 @@ func outputAsJSON(creds CloudCredentials, cmd *cobra.Command) {
 // New output functions for key-based approach
 func outputKeysAsEnvVars(keyResponses map[string]KeyCredentialResponse, cmd *cobra.Command) {
 	totalVars := 0
-	
+
 	for keyName, response := range keyResponses {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "🔑 Key: %s (expires: %s)\n", keyName, response.ExpiresAt)
-		
+
 		for envVar, value := range response.Credentials {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "export %s=%s\n", envVar, value)
 			totalVars++
 		}
 	}
-	
+
 	// Print success message to stderr so it doesn't interfere with sourcing
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "✅ Successfully minted %d keys with %d environment variables\n", len(keyResponses), totalVars)
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "💡 To use: eval \"$(voidkey mint --keys MINIO_CREDENTIALS)\"\n")

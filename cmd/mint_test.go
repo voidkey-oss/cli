@@ -366,7 +366,7 @@ func TestMintCredentialsWithFlags_WithKeyset(t *testing.T) {
 	// Check standard AWS credentials in output
 	assert.Contains(t, stdout.String(), "export AWS_ACCESS_KEY_ID=AKIATEST123")
 	assert.Contains(t, stdout.String(), "export AWS_SECRET_ACCESS_KEY=secretkey123")
-	
+
 	// Check keyset environment variables in output
 	assert.Contains(t, stdout.String(), "export MINIO_ADMIN_ROLE=minio:admin")
 	assert.Contains(t, stdout.String(), "export ACCESS_LEVEL=admin")
