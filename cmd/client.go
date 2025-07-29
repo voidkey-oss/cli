@@ -225,3 +225,92 @@ func (c *VoidkeyClient) GetKeysetKeysWithToken(token string, keysetName string) 
 
 	return keys, nil
 }
+
+// New key-based methods
+
+// MintKeys calls the broker server to mint specific keys using the new API
+func (c *VoidkeyClient) MintKeys(oidcToken string, idpName string, keys []string, duration int, all bool) (map[string]KeyCredentialResponse, error) {
+	// Prepare request
+	reqBody := struct {
+		OidcToken string   `json:"oidcToken"`
+		IdpName   string   `json:"idpName,omitempty"`
+		Keys      []string `json:"keys,omitempty"`
+		Duration  int      `json:"duration,omitempty"`
+		All       bool     `json:"all,omitempty"`
+	}{
+		OidcToken: oidcToken,
+		IdpName:   idpName,
+		Keys:      keys,
+		Duration:  duration,
+		All:       all,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Make HTTP request to new keys endpoint
+	url := fmt.Sprintf("%s/credentials/mint-keys", c.serverURL)
+	resp, err := c.client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var keyResponses map[string]KeyCredentialResponse
+	if err := json.Unmarshal(body, &keyResponses); err != nil {
+		return nil, fmt.Errorf("failed to parse key responses: %w", err)
+	}
+
+	return keyResponses, nil
+}
+
+// GetAvailableKeys calls the broker server to get available keys for an identity
+func (c *VoidkeyClient) GetAvailableKeys(token string) ([]string, error) {
+	// Make HTTP request
+	url := fmt.Sprintf("%s/credentials/keys?token=%s", c.serverURL, token)
+	resp, err := c.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to broker server at %s: %w", c.serverURL, err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var keys []string
+	if err := json.Unmarshal(body, &keys); err != nil {
+		return nil, fmt.Errorf("failed to parse keys response: %w", err)
+	}
+
+	return keys, nil
+}
+
+// KeyCredentialResponse represents a single key's credential response
+type KeyCredentialResponse struct {
+	Credentials map[string]string `json:"credentials"`
+	ExpiresAt   string            `json:"expiresAt"`
+	Metadata    map[string]any    `json:"metadata,omitempty"`
+}
