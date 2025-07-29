@@ -38,76 +38,6 @@ func TestNewVoidkeyClient(t *testing.T) {
 	assert.Equal(t, serverURL, client.serverURL)
 }
 
-func TestVoidkeyClient_MintCredentials_Success(t *testing.T) {
-	mockClient := &MockHTTPClient{}
-	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
-
-	expectedCreds := CloudCredentials{
-		AccessKey:    "AKIATEST123",
-		SecretKey:    "secretkey123",
-		SessionToken: "sessiontoken123",
-		ExpiresAt:    "2024-12-31T23:59:59Z",
-	}
-
-	responseBody, _ := json.Marshal(expectedCreds)
-	resp := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(bytes.NewReader(responseBody)),
-	}
-
-	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
-
-	credentials, err := client.MintCredentials("test-token", "test-idp", "")
-
-	assert.NoError(t, err)
-	assert.NotNil(t, credentials)
-	assert.Equal(t, expectedCreds.AccessKey, credentials.AccessKey)
-	assert.Equal(t, expectedCreds.SecretKey, credentials.SecretKey)
-	assert.Equal(t, expectedCreds.SessionToken, credentials.SessionToken)
-	assert.Equal(t, expectedCreds.ExpiresAt, credentials.ExpiresAt)
-
-	mockClient.AssertExpectations(t)
-}
-
-func TestVoidkeyClient_MintCredentials_ServerError(t *testing.T) {
-	mockClient := &MockHTTPClient{}
-	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
-
-	resp := &http.Response{
-		StatusCode: http.StatusInternalServerError,
-		Body:       io.NopCloser(strings.NewReader("Internal server error")),
-	}
-
-	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
-
-	credentials, err := client.MintCredentials("test-token", "test-idp", "")
-
-	assert.Error(t, err)
-	assert.Nil(t, credentials)
-	assert.Contains(t, err.Error(), "server returned error 500")
-
-	mockClient.AssertExpectations(t)
-}
-
-func TestVoidkeyClient_MintCredentials_InvalidJSON(t *testing.T) {
-	mockClient := &MockHTTPClient{}
-	client := NewVoidkeyClient(mockClient, "http://localhost:3000")
-
-	resp := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader("invalid json")),
-	}
-
-	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
-
-	credentials, err := client.MintCredentials("test-token", "test-idp", "")
-
-	assert.Error(t, err)
-	assert.Nil(t, credentials)
-	assert.Contains(t, err.Error(), "failed to parse credentials response")
-
-	mockClient.AssertExpectations(t)
-}
 
 func TestVoidkeyClient_ListIdpProviders_Success(t *testing.T) {
 	mockClient := &MockHTTPClient{}
@@ -231,7 +161,7 @@ func TestVoidkeyClient_MintKeys_Success(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewReader(responseBody)),
 	}
 
-	mockClient.On("Post", "http://localhost:3000/credentials/mint-keys", "application/json", mock.Anything).Return(resp, nil)
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
 	keys := []string{"MINIO_CREDENTIALS", "AWS_CREDENTIALS"}
 	keyResponses, err := client.MintKeys("test-token", "test-idp", keys, 1800, false)
@@ -266,7 +196,7 @@ func TestVoidkeyClient_MintKeys_AllFlag(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewReader(responseBody)),
 	}
 
-	mockClient.On("Post", "http://localhost:3000/credentials/mint-keys", "application/json", mock.Anything).Return(resp, nil)
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
 	keyResponses, err := client.MintKeys("test-token", "test-idp", nil, 0, true)
 
@@ -287,7 +217,7 @@ func TestVoidkeyClient_MintKeys_ServerError(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader("Key not found")),
 	}
 
-	mockClient.On("Post", "http://localhost:3000/credentials/mint-keys", "application/json", mock.Anything).Return(resp, nil)
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
 	keys := []string{"INVALID_KEY"}
 	keyResponses, err := client.MintKeys("test-token", "test-idp", keys, 0, false)
@@ -308,7 +238,7 @@ func TestVoidkeyClient_MintKeys_InvalidJSON(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader("invalid json")),
 	}
 
-	mockClient.On("Post", "http://localhost:3000/credentials/mint-keys", "application/json", mock.Anything).Return(resp, nil)
+	mockClient.On("Post", "http://localhost:3000/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 
 	keys := []string{"MINIO_CREDENTIALS"}
 	keyResponses, err := client.MintKeys("test-token", "test-idp", keys, 0, false)

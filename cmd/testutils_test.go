@@ -47,13 +47,22 @@ func SetupTestCommand() (*cobra.Command, *bytes.Buffer, *bytes.Buffer) {
 	return cmd, &stdout, &stderr
 }
 
-// CreateTestCredentials returns sample credentials for testing
-func CreateTestCredentials() CloudCredentials {
-	return CloudCredentials{
-		AccessKey:    "AKIATEST123456789",
-		SecretKey:    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-		SessionToken: "AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE/IvU1dYUg2RVAJBanLiHb4IgRmpRV3zrkuWJOgQs8IZZaIv2BXIa2R4OlgkBN9bkUDNCJiBeb/AXlzBBko7b15fjrBs2+cTQtpZ3CYWFXG8C5zqx37wnOE49mRl/+OtkIKGO7fAE",
-		ExpiresAt:    "2024-12-31T23:59:59Z",
+// CreateTestKeyCredentials returns sample key credentials for testing
+func CreateTestKeyCredentials() map[string]KeyCredentialResponse {
+	return map[string]KeyCredentialResponse{
+		"MINIO_CREDENTIALS": {
+			Credentials: map[string]string{
+				"MINIO_ACCESS_KEY_ID":     "AKIATEST123456789",
+				"MINIO_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+				"MINIO_SESSION_TOKEN":     "session-token-123",
+				"MINIO_ENDPOINT":          "http://localhost:9000",
+			},
+			ExpiresAt: "2024-12-31T23:59:59Z",
+			Metadata: map[string]any{
+				"provider": "minio-test",
+				"keyName":  "MINIO_CREDENTIALS",
+			},
+		},
 	}
 }
 
@@ -86,7 +95,7 @@ func AssertCommandOutput(t *testing.T, stdout, stderr *bytes.Buffer, expectedStd
 }
 
 // MockSuccessfulMintResponse sets up a mock for successful credential minting
-func MockSuccessfulMintResponse(mockClient *MockHTTPClient, serverURL string, credentials CloudCredentials) {
+func MockSuccessfulMintResponse(mockClient *MockHTTPClient, serverURL string, credentials map[string]KeyCredentialResponse) {
 	resp := CreateMockHTTPResponse(http.StatusOK, credentials)
 	mockClient.On("Post", serverURL+"/credentials/mint", "application/json", mock.Anything).Return(resp, nil)
 }
@@ -176,17 +185,23 @@ func TestCreateMockHTTPResponse(t *testing.T) {
 	}
 }
 
-// TestCreateTestCredentials verifies the test credentials helper
-func TestCreateTestCredentials(t *testing.T) {
-	creds := CreateTestCredentials()
+// TestCreateTestKeyCredentials verifies the test credentials helper
+func TestCreateTestKeyCredentials(t *testing.T) {
+	creds := CreateTestKeyCredentials()
 
-	if creds.AccessKey == "" {
-		t.Error("AccessKey should not be empty")
+	if len(creds) == 0 {
+		t.Error("Should return at least one key credential")
 	}
-	if creds.SecretKey == "" {
-		t.Error("SecretKey should not be empty")
+
+	minioCredentials, exists := creds["MINIO_CREDENTIALS"]
+	if !exists {
+		t.Error("Should contain MINIO_CREDENTIALS")
 	}
-	if creds.ExpiresAt == "" {
+
+	if minioCredentials.Credentials["MINIO_ACCESS_KEY_ID"] == "" {
+		t.Error("MINIO_ACCESS_KEY_ID should not be empty")
+	}
+	if minioCredentials.ExpiresAt == "" {
 		t.Error("ExpiresAt should not be empty")
 	}
 }
