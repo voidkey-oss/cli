@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/voidkey-labs/cli/cmd"
+	"github.com/voidkey-oss/cli/cmd"
 )
 
 // These variables are set by goreleaser during build

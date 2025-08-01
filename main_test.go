@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/voidkey-labs/cli/cmd"
+	"github.com/voidkey-oss/cli/cmd"
 )
 
 func TestSetVersionInfo(t *testing.T) {

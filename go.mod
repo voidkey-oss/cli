@@ -1,4 +1,4 @@
-module github.com/voidkey-labs/cli
+module github.com/voidkey-oss/cli
 
 go 1.22.2
 
